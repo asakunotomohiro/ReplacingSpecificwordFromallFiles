@@ -9,8 +9,8 @@ sub main() {
 	# ユーザから渡されたファイルを別途保存する。
 	my $object = mainProcess->new(@ARGV);
 	$object->help() unless @ARGV;
-	$object->filenameShow();
-	say $object->filecount();
+	#$object->filenameShow();
+	#say $object->filecount();
 	$object->run();
 }
 &main(@ARGV);
