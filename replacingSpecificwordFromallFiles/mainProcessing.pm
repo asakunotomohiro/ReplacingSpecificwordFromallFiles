@@ -1,13 +1,8 @@
-package perlasakuno::replacingSpecificwordFromallFiles;
+package parent::process;
 BEGIN { push @INC, "." };	# セキュリティ上大丈夫か？
 $VERSION = "0.001";
 use v5.24;
-
-package replacingSpecificwordFromallFiles::process;
-
-package parent::process;
 use Carp;
-use File::Spec;
 
 sub help() {
 	my $self = shift;
@@ -32,7 +27,7 @@ my $pascalCase = sub{
 	my @split = split /_/, shift;
 	my $ret;
 	foreach my $value ( @split ){
-		# 頭文字のみ大文字。
+		# 頭文字のみ大文字(のこりは小文字)。
 		$ret .= "\u\L$value";
 	}
 	return $ret
@@ -41,20 +36,8 @@ my $pascalCase = sub{
 my $camelcase = sub{
 	# スネーク形式をローワキャメル形式に変換する。
 	#	例）ABC_DEF	⇒	abcDef
-	#my @split = split /_/, shift;
-	#say "引数：@_";
 	my $ret = $pascalCase->(@_);
-#	while( my( $index, $value) = each ( @split ) ){
-#		if( $index == 0 ) {
-#			# 先頭単語は全て小文字。
-#			$ret .= "\L$value";
-#		}
-#		else{
-#			# 頭文字のみ大文字。
-#			$ret .= "\u\L$value";
-#		}
-#	}
-	"\l$ret"
+	"\l$ret"	# 頭文字だけを小文字にする。
 };
 
 sub new() {
@@ -75,17 +58,13 @@ sub new() {
 			},
 		);	# これに保存する。
 	$self = ref($self) || $self;
-	#say "@argv";
 	$filename{option}->{hashNosize} = keys %filename;
-	#say $filename{option}->{hashNosize};
 
 	my $argvOne;
 	while( my( $index, $value ) = each ( @argv )) {
 
 		if( -s -f $value ) {
-			#$value = File::Spec->rel2abs($value);
 			$filename{$index} = "$value";
-			#say "$index, $value.";
 		}
 		elsif( -z _ ) {
 			warn "空ファイル($value)。";
@@ -98,9 +77,7 @@ sub new() {
 					when ('type')        { $filename{option}->{type} = $value if defined $value }
 					when ('place')       { $filename{option}->{place} = $value if defined $value }
 					when ('size')        { $filename{option}->{size} = $value if defined $value }
-					#when ('hashNosize')  { $filename{option}->{hashNosize} = $value }
 					when ('hashNosize')  { die '読み取り専用値を書き換えるな'; }
-					#when ('hashSize')    { $filename{option}->{hashSize} = $value }
 					when ('hashSize')    { die '読み取り専用値を書き換えるな'; }
 #					default	{ say "その他の実行はない。" };
 				};
@@ -108,13 +85,7 @@ sub new() {
 			$argvOne = $value;
 		}
 	}
-	#say "$filename{0}";
-	#say "$filename{1}";
-	#say keys %filename;
 	my $size = keys %filename;
-	#say $size;
-	#say '型：' . $filename{option}->{type};
-	#say 'hashNosize：' . $filename{option}->{hashNosize};
 	$filename{option}->{hashSize} = $size - $filename{option}->{hashNosize};
 
 	bless \%filename, $self;
@@ -126,8 +97,6 @@ sub filenameShow() {
 	my $self = shift;
 	my @argv = @_;
 
-	#say keys %$self;
-	#say "$self->{0}";
 	croak "引数にファイルを渡すこと。" unless defined(keys %$self);
 	foreach my $key ( keys %$self ) {
 		say "$key->$self->{$key}" unless ref $self->{$key};
@@ -164,19 +133,15 @@ sub write() {
 	my $filename = shift;	# ファイル名
 	my $file = shift;		# ファイルの中身(リファレンス)
 
-	#say $filename . "書き出しファイル名";
 	open my $file_fh, '>', $filename or die "$filenameのファイルオープン失敗($!)";
-	#say "書き出しデータ" . "@$file";
 	foreach my $value ( @$file ) {
 		chomp $value;
 		print $file_fh $value;
 	}
 }
 
-
 package mainProcess;
 use Carp;
-
 our @ISA = qw( parent::process );
 
 sub run() {
@@ -184,16 +149,6 @@ sub run() {
 
 	while( my ($index, $filename) = each ( %$self ) ){
 		if( -f $filename and -s _ >= $self->{option}->{size} ) {
-		#say "$indexファイル：$filename" . %$self . -f $filename . "<";# . keys %$self;
-		#if( -f $filename ){#and -s _ >= $self->{option}->{size} ) {
-		#say "設定値：$self->{option}->{size}";
-		#say -f $filename;
-		#if( -s $filename >= $self->{option}->{size} ){#and ) {
-		#if( "$index" ne "option" and -s $filename >= $self->{option}->{size} ) {
-			#say "$index, $filename" . %$self;
-		#if( "$index" ne "option"){# and -s $filename >= $self->{option}->{size} ) {
-			#say "$index, $filename. -> " . %$self . -s _;
-#			return;
 			my $file_fh = $self->open($filename);
 			my $type = "\L$self->{option}->{type}";
 			my @file = <$file_fh>;
@@ -202,27 +157,16 @@ sub run() {
 				# ファイル内容を1度に読み込むため、気をつけること。
 				my $placeLine;	# ここに置換文字列を格納する。
 				if( "$file[$line]" =~ /$self->{option}->{search}/ ) {
-					#say "変更前：$file[$line]";
 					$placeLine = $line + $self->{option}->{place};	# 置き換え対象行を保存する。
-					#my $placeWord = $file[$placeLine] =~ s/ ([A-Z_]+) \{/\1/r;	# 関数名と思わしき単語を抜き出す(ここでは加工をしない)。
 					my $placeWord = $file[$placeLine] =~ s/.* ([A-Z_]+) \{.*/\1/r;	# 関数名と思わしき単語を抜き出す(ここでは加工をしない)。
-					#say "置換単語：$placeWord";
 					chomp $placeWord;
-					#say "置換単語：$file[$placeLine]";
-					#say ref( $self->{option}->{$type} ) . "関数を呼び出したい$type";
 					my $placeWord = $self->{option}->{$type}->($placeWord);	# 加工
 					my $word = $file[$line] =~ s/$self->{option}->{search}/$placeWord/r;	# 既存行を置き換える。
 					$file[$line] = $word;
-					#say "変更後：<$placeWord>$word";
-					#say "変更後：$file[$line]";
 				}
 			}
 			close $file_fh;	# ファイルハンドル終了。
 			$self->filemove($filename);	# 既存ファイルのバックアップ。
-			#say "<@file>";
-			#foreach my $line (@file) {
-			#	say $line;
-			#}
 			$self->write($filename, \@file);	# 同名ファイルに吐き出し。
 		}
 	}
