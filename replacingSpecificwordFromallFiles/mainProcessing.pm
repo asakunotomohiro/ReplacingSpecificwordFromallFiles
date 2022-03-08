@@ -63,6 +63,22 @@ my $searchfunc = sub{
 	}
 };
 
+my $typefunc = sub{
+	my $hash = shift;
+	my $value = shift;
+	my @typeKey = qw( lcc ucc sc );	# この中に含まれている単語のみ許可する。
+		# lcc	ローワキャメル形式
+		# ucc	アッパーキャメル形式
+		# sc	スネーク形式(未実装)
+
+	my $special = $";	# バックアップ。
+	$" = '|';
+	if( "\L$$value" =~ /\L@typeKey/ ) {
+		$hash->{option}->{type} = "\L$$value";
+	}
+	$" = $special;	# 戻す。
+};
+
 sub new() {
 	no warnings 'experimental::smartmatch';
 	# ユーザから渡されたファイルを全てハッシュに保存する。
@@ -97,7 +113,7 @@ sub new() {
 				# ここの処理が走る場合は、else文2回目の実行と言うこと。
 				given ($argvOne) {
 					when ('search')      { $searchfunc->( \%filename, \$value ); }
-					when ('type')        { $filename{option}->{type} = $value if defined $value }
+					when ('type')        { $typefunc->( \%filename, \$value ); }
 					when ('place')       { $filename{option}->{place} = $value if defined $value }
 					when ('size')        { $filename{option}->{size} = $value if defined $value }
 					when ('hashNosize')  { die '読み取り専用値を書き換えるな'; }
