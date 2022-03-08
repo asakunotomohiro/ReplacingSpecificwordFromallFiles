@@ -113,6 +113,18 @@ my $extensionfunc = sub{
 	}
 };
 
+my $optExternalfilefunc = sub {
+	# オプション変更を引数ファイルから読み込めるようにするための関数。
+	my $self = shift;
+	my $value = shift;	# 外部ファイル名。
+
+	if( -s -f $$value ) {
+		$self->{option}->{optfile} = $$value;
+		$self->{option}->{optionfiledo} = 1;	# 特に意味は無いのだが、とりあえず1にする。
+	}
+	#say "関数：$self->{option}->{optfile}";
+};
+
 my $extensionPartition = sub {
 	# 引数ファイルから必要な拡張子を持ったファイルを残し、他を削除する関数。
 	my $self = shift;
@@ -147,7 +159,7 @@ sub new() {
 				hashNosize => 0,		# 自動取得(このハッシュの初期容量)。手動書き換え不可。
 				filecount  => 1,		# 自動取得(引数ファイル数)。手動書き換え不可。
 				optfile => undef,		# オプション変更用ファイル名指定。
-				optionfiledo => 0,		# オプション変更用ファイル有無設定。
+				optionfiledo => 0,		# オプション変更用ファイル有無設定(使う場合1・使わない場合0)。実質このオプション使っていない。
 			},
 		);	# これに保存する。
 	$self = ref($self) || $self;
@@ -157,18 +169,22 @@ sub new() {
 	while( my( $index, $value ) = each ( @argv )) {
 		# このループ処理は関数に追い出したい・・・。
 
-		if( -s -f $value ) {
+		if( -s -f $value and 'optfile' ne "$argvOne" ) {
+			#say "if $value";
 			$filename{$index} = "$value";
 		}
 		elsif( -d _ ) {
 			# ディレクトリ
+			#say "elsif -d $value";
 			push @argv, <$value/*>;
 			next;
 		}
-		elsif( -z _ ) {
+		elsif( -z -f _ ) {
+			#say "elsif -z -f $value";
 			warn "空ファイル($value)。";
 		}
 		else {
+			#say "else $value";
 			# この辺りは関数にまとめたい。
 			if( defined $argvOne ) {
 				# ここの処理が走る場合は、else文2回目の実行と言うこと。
@@ -178,8 +194,10 @@ sub new() {
 					when ('place')       { $placefunc->( \%filename, \$value ); }	# 検索場所(次行)
 					when ('filesize')    { $filesizefunc->( \%filename, \$value ); }	# ファイル最大容量。
 					when ('extension')   { $extensionfunc->( \%filename, \$value ); }	# 拡張子
+					when ('optfile')     { $optExternalfilefunc->( \%filename, \$value ); }	# オプション変更を引数からファイルを指定する。
 					when ('hashNosize')  { die '読み取り専用値を書き換えるな'; }
 					when ('filecount')   { die '読み取り専用値を書き換えるな'; }
+					when ('optionfiledo'){ die '読み取り専用値を書き換えるな'; }
 #					default	{ say "その他の実行はない。" };
 				};
 			}
@@ -205,7 +223,8 @@ sub optionShow() {
 	foreach my $key ( keys %{$self->{option}} ) {
 		unless( $key =~ /@notKey/ ) {
 			# リファレンスもしくは、空文字列の場合は、非表示。
-			say "$key->$self->{option}->{$key}" if !(ref $self->{$key}) and (defined $self->{option}->{$key});
+			#say "$key->$self->{option}->{$key}" if !(ref $self->{$key}) and (defined $self->{option}->{$key});
+			say "$key->$self->{option}->{optfile}";
 		}
 	}
 	$" = $special;	# 戻す。
