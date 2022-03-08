@@ -165,12 +165,14 @@ sub new() {
 			# ディレクトリ
 			#my $dir = dirname $value;
 			#my ( $basename, $dirname, $ext ) = fileparse($value);
-			my $ext = $filename{option}->{extension};	# 拡張子の取り出し。
+			#my $ext = $filename{option}->{extension};	# 拡張子の取り出し。
 			#say "dir($value)：$dirname";
 			#my @files = glob "$value/*$ext";
-			my @files = glob "$value/*";
+			#my @files = glob "$value/*";
 			#say "ディレクトリ名：$value(ファイル群：@files)";
-			push @argv, @files;
+			#push @argv, @files;
+			#push @argv, glob "$value/*";
+			push @argv, <$value/*>;
 			next;
 		}
 		elsif( -z _ ) {
