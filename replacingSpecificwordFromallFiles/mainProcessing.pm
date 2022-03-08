@@ -107,13 +107,13 @@ my $extensionfunc = sub{
 	my $hash = shift;
 	my $value = shift;
 
-	if( defined $$value and $$value =~ /[^\w]/ ) {
-		say "Perlでの識別子以外の文字設定不可：$$value";
+	#say "[$$value]";
+	if( defined $$value and $$value =~ /\A(\.\w+)+\z/ ) {
+		$hash->{option}->{extension} = $$value;
 	}
 	else{
-		# Perlでの識別子に限り、検索単語として利用する(本来やりたいことズレているが、そこまでの乖離はないだろう)。
-		# ※マイナス数字なども不可になる。
-		$hash->{option}->{extension} = $$value;
+		say "拡張子指定はピリオドから始めること：$$value(また、Perlでの識別子以外も不可)";
+		# ピリオドが連続での拡張子指定も不可(他にも制限があるかも？)。
 	}
 };
 
@@ -123,6 +123,8 @@ my $extensionPartition = sub {
 	my $self = shift;
 
 	my $main = $self->{option}->{extension};	# オプションの中から拡張子を取り出す。
+	say "拡張子：$main";
+	return unless defined $main;	# 設定値がない場合、何もせずに終了する。
 	while( my( $index, $value ) = each ( %$self ) ) {
 		next if ref $value;
 		my ( $basename, $dirname, $ext ) = fileparse($value, qr/\..*$/ );	# ファイル名を拡張子より前の部分・ディレクトリ部分・拡張子部分に分ける。
@@ -130,7 +132,7 @@ my $extensionPartition = sub {
 #		say "basename：$basename";
 #		say "dirname：$dirname";
 #		say "ext：$ext";
-		if( "\L$main" eq "\L$ext" ) {
+		if( "\L$main" ne "\L$ext" ) {
 			# 指定拡張子以外の場合、削除。
 			delete $self->{$index};
 		}
@@ -150,7 +152,7 @@ sub new() {
 				ucc    => $pascalCase,	# アッパーキャメル形式関数。
 				place  => 1,			# 検索場所(次行)
 				filesize   => 0,		# ファイル最大容量。
-				extension => '.json',	# 拡張子
+				extension => undef,		# 拡張子
 				hashNosize => 0,		# 自動取得(このハッシュの初期容量)。手動書き換え不可。
 				filecount => 1,			# 自動取得(引数ファイル数)。手動書き換え不可。
 			},
