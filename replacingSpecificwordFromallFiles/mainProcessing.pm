@@ -3,6 +3,7 @@ BEGIN { push @INC, "." };	# セキュリティ上大丈夫か？
 $VERSION = "0.001";
 use v5.24;
 use Carp;
+use File::Basename qw( fileparse );	# ファイル拡張子取りだし。
 
 sub help() {
 	my $self = shift;
@@ -115,6 +116,27 @@ my $extensionfunc = sub{
 	}
 };
 
+#sub extensionPartition() {
+my $extensionPartition = sub {
+	# 引数ファイルから必要な拡張子を持ったファイルを残し、他を削除する関数。
+	my $self = shift;
+
+	#say $self;
+	my $main = $self->{option}->{extension};	# オプションの中から拡張子を取り出す。
+	#say $main;
+	while( my( $index, $value ) = each ( %$self ) ) {
+		next if ref $value;
+		my ( $basename, $dirname, $ext ) = fileparse($value, qr/\..*$/ );
+		say "value：$value";
+		say "basename：$basename";
+		say "dirname：$dirname";
+		say "ext：$ext";
+		if( "\L$main" eq "\L$ext" ) {
+			delete $self->{$index};
+		}
+	}
+};
+
 sub new() {
 	no warnings 'experimental::smartmatch';
 	# ユーザから渡されたファイルを全てハッシュに保存する。
@@ -128,7 +150,7 @@ sub new() {
 				ucc    => $pascalCase,	# アッパーキャメル形式関数。
 				place  => 1,			# 検索場所(次行)
 				filesize   => 0,		# ファイル最大容量。
-				extension => 'json',	# 拡張子
+				extension => '.json',	# 拡張子
 				hashNosize => 0,		# 自動取得(このハッシュの初期容量)。手動書き換え不可。
 				filecount => 1,			# 自動取得(引数ファイル数)。手動書き換え不可。
 			},
@@ -164,6 +186,9 @@ sub new() {
 	}
 	my $size = keys %filename;
 	$filename{option}->{filecount} = $size - $filename{option}->{hashNosize};	# 有効なファイル数の確認。
+	#$self->extensionPartition();	# 拡張子検査。
+	#$self->extensionPartition(\%filename);	# 拡張子検査。
+	$extensionPartition->(\%filename);	# 拡張子検査。
 
 	bless \%filename, $self;
 }
