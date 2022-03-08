@@ -161,8 +161,6 @@ sub new() {
 		if( -s -f $value ) {
 			$filename{$index} = "$value";
 		}
-		#elsif( -z _ ) {
-		#	warn "空ファイル($value)。";
 		elsif( -d _ ) {
 			# ディレクトリ
 			#my $dir = dirname $value;
@@ -174,6 +172,9 @@ sub new() {
 			#say "ディレクトリ名：$value(ファイル群：@files)";
 			push @argv, @files;
 			next;
+		}
+		elsif( -z _ ) {
+			warn "空ファイル($value)。";
 		}
 		else {
 			# この辺りは関数にまとめたい。
