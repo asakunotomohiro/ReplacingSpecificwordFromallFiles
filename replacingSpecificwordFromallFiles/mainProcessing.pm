@@ -10,14 +10,14 @@ sub help() {
 
 	say "引数にファイルを渡すこと。";
 	say "\tファイル内容には、置換前の文字列と置換後の文字列が含まれていること。";
-	say "\t置換対象は、''をプログラムファイルと同じ場所に作成しておくこと。";
+	say "\t置換対象は、'[ここにファイル名]'をプログラムファイルと同じ場所に作成しておくこと(以下、未実装)。";
 	say "\tもし、作成しない場合のデフォルト(置換対象)：xxx";
 	say "\tもし、作成しない場合のデフォルト(置換形式)：キャメル形式(1単語目の頭文字は小文字・2単語目以降の頭文字大文字)";
-	say "\tファイル内容の1行名：検索対象。　※未実装(デフォルト値：xxx)";
-	say "\tファイル内容の2行名：置換形式。　※未実装(デフォルト値：キャメル形式)";
-	say "\tファイル内容の3行名：検索場所(当行0・前行-1・次行1など)。　※未実装(全て大文字になっている単語を取り出す。要は関数名)";
-	say "\tファイル内容の4行名：読み込みファイル最大容量(ファイルを一度に読み込むため、メモリ枯渇を防ぐために最大MB数を指定する)。　※未実装";
-	say "\t\t\tデフォルト値：ファイル最大容量上限なし。";
+	say "\tファイル内容の1行名：検索対象(デフォルト値：xxx)。";
+	say "\tファイル内容の2行名：置換形式(デフォルト値：キャメル形式)。";
+	say "\tファイル内容の3行名：検索場所(当行0・前行-1・次行1など)。";
+	say "\tファイル内容の4行名：読み込みファイル最大容量。";
+	say "\t\t\tデフォルト値：ファイル最大容量上限なし(ファイルを一度に読み込むため、メモリ枯渇を防ぐために最大MB数を指定する)。";
 	say "以上。";
 }
 
@@ -40,6 +40,11 @@ my $camelcase = sub{
 	"\l$ret"	# 頭文字だけを小文字にする。
 };
 
+my $snakeCase = sub{
+	# キャメル形式をスネーク形式に変換する。
+	'未実装';
+};
+
 sub new() {
 	no warnings 'experimental::smartmatch';
 	# ユーザから渡されたファイルを全てハッシュに保存する。
@@ -54,7 +59,7 @@ sub new() {
 				place  => 1,		# 検索場所(次行)
 				size   => 0,		# ファイル最大容量。
 				hashNosize => 0,	# 自動取得(このハッシュの初期容量)。手動書き換え不可。
-				hashSize => 1,		# 自動取得(引数ファイル数)。手動書き換え不可。
+				filecount => 1,		# 自動取得(引数ファイル数)。手動書き換え不可。
 			},
 		);	# これに保存する。
 	$self = ref($self) || $self;
@@ -78,7 +83,7 @@ sub new() {
 					when ('place')       { $filename{option}->{place} = $value if defined $value }
 					when ('size')        { $filename{option}->{size} = $value if defined $value }
 					when ('hashNosize')  { die '読み取り専用値を書き換えるな'; }
-					when ('hashSize')    { die '読み取り専用値を書き換えるな'; }
+					when ('filecount')    { die '読み取り専用値を書き換えるな'; }
 #					default	{ say "その他の実行はない。" };
 				};
 			}
@@ -86,7 +91,7 @@ sub new() {
 		}
 	}
 	my $size = keys %filename;
-	$filename{option}->{hashSize} = $size - $filename{option}->{hashNosize};
+	$filename{option}->{filecount} = $size - $filename{option}->{hashNosize};	# 有効なファイル数の確認。
 
 	bless \%filename, $self;
 }
@@ -107,7 +112,7 @@ sub filecount() {
 	# 引数に渡したファイル数を戻す。
 	my $self = shift;
 
-	return $self->{option}->{hashSize};
+	return $self->{option}->{filecount};
 }
 
 sub open() {
@@ -147,6 +152,7 @@ our @ISA = qw( parent::process );
 sub run() {
 	my $self = shift;
 
+	warn "有効なファイルが存在しない。" . $self->help() unless $self->{option}->{filecount};
 	while( my ($index, $filename) = each ( %$self ) ){
 		if( -f $filename and -s _ >= $self->{option}->{size} ) {
 			my $file_fh = $self->open($filename);
