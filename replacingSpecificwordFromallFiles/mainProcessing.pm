@@ -13,14 +13,14 @@ sub help() {
 #		print;
 #	}
 	say "\tファイル内容には、置換前の文字列と置換後の文字列が含まれていること。";
-	say "\t置換対象は、'[ここにファイル名]'をプログラムファイルと同じ場所に作成しておくこと(以下、未実装)。";
-	say "\tもし、作成しない場合のデフォルト(置換対象)：xxx";
-	say "\tもし、作成しない場合のデフォルト(置換形式)：キャメル形式(1単語目の頭文字は小文字・2単語目以降の頭文字大文字)";
-	say "\tファイル内容の1行名：検索対象(デフォルト値：xxx)。";
-	say "\tファイル内容の2行名：置換形式(デフォルト値：キャメル形式)。";
-	say "\tファイル内容の3行名：検索場所(当行0・前行-1・次行1など)。";
-	say "\tファイル内容の4行名：読み込みファイル最大容量。";
-	say "\t\t\tデフォルト値：ファイル最大容量上限なし(ファイルを一度に読み込むため、メモリ枯渇を防ぐために最大MB数を指定する)。";
+	say "\t置換対象は、'[ここにファイル名]'をプログラムファイルと同じ場所に作成しておくこと(未実装)。";
+#	say "\tもし、作成しない場合のデフォルト(置換対象)：xxx";
+#	say "\tもし、作成しない場合のデフォルト(置換形式)：キャメル形式(1単語目の頭文字は小文字・2単語目以降の頭文字大文字)";
+#	say "\tファイル内容の1行名：検索対象(デフォルト値：xxx)。";
+#	say "\tファイル内容の2行名：置換形式(デフォルト値：キャメル形式)。";
+#	say "\tファイル内容の3行名：検索場所(当行0・前行-1・次行1など)。";
+#	say "\tファイル内容の4行名：読み込みファイル最大容量。";
+#	say "\t\t\t\tデフォルト値：ファイル最大容量上限なし(ファイルを一度に読み込むため、メモリ枯渇を防ぐために最大MB数を指定する)。";
 	say "以上。";
 }
 
@@ -49,6 +49,7 @@ my $snakeCase = sub{
 };
 
 my $searchfunc = sub{
+	# 設定値：検索単語。
 	my $hash = shift;
 	my $value = shift;
 
@@ -63,6 +64,7 @@ my $searchfunc = sub{
 };
 
 my $typefunc = sub{
+	# 設定値：置換形式。
 	my $hash = shift;
 	my $value = shift;
 	my @typeKey = qw( lcc ucc sc );	# この中に含まれている単語のみ許可する。
@@ -79,6 +81,7 @@ my $typefunc = sub{
 };
 
 my $placefunc = sub{
+	# 設定値：検索対象行。
 	my $hash = shift;
 	my $value = shift;
 
@@ -88,11 +91,27 @@ my $placefunc = sub{
 };
 
 my $filesizefunc = sub{
+	# 設定値：ファイルサイズ。
 	my $hash = shift;
 	my $value = shift;
 
 	if( defined $$value and $$value =~ /\d/ ) {
 		$hash->{option}->{filesize} = $$value;
+	}
+};
+
+my $extensionfunc = sub{
+	# 設定値：拡張子。
+	my $hash = shift;
+	my $value = shift;
+
+	if( defined $$value and $$value =~ /[^\w]/ ) {
+		say "Perlでの識別子以外の文字設定不可：$$value";
+	}
+	else{
+		# Perlでの識別子に限り、検索単語として利用する(本来やりたいことズレているが、そこまでの乖離はないだろう)。
+		# ※マイナス数字なども不可になる。
+		$hash->{option}->{extension} = $$value;
 	}
 };
 
@@ -103,14 +122,15 @@ sub new() {
 	my @argv = @_;
 	my %filename = (
 			option => {
-				search => 'xxx',	# 検索対象(この単語を置き換える)
-				type   => 'lcc',	# 置換形式(ローワキャメル形式)アッパーキャメル形式の場合はucc・スネーク形式sc
+				search => 'xxx',		# 検索対象(この単語を置き換える)
+				type   => 'lcc',		# 置換形式(ローワキャメル形式)アッパーキャメル形式の場合はucc・スネーク形式sc
 				lcc    => $camelcase,	# ローワキャメル形式関数。
 				ucc    => $pascalCase,	# アッパーキャメル形式関数。
-				place  => 1,		# 検索場所(次行)
-				filesize   => 0,	# ファイル最大容量。
-				hashNosize => 0,	# 自動取得(このハッシュの初期容量)。手動書き換え不可。
-				filecount => 1,		# 自動取得(引数ファイル数)。手動書き換え不可。
+				place  => 1,			# 検索場所(次行)
+				filesize   => 0,		# ファイル最大容量。
+				extension => 'json',	# 拡張子
+				hashNosize => 0,		# 自動取得(このハッシュの初期容量)。手動書き換え不可。
+				filecount => 1,			# 自動取得(引数ファイル数)。手動書き換え不可。
 			},
 		);	# これに保存する。
 	$self = ref($self) || $self;
@@ -129,16 +149,17 @@ sub new() {
 			if( defined $argvOne ) {
 				# ここの処理が走る場合は、else文2回目の実行と言うこと。
 				given ($argvOne) {
-					when ('search')      { $searchfunc->( \%filename, \$value ); }
-					when ('type')        { $typefunc->( \%filename, \$value ); }
-					when ('place')       { $placefunc->( \%filename, \$value ); }
-					when ('filesize')    { $filesizefunc->( \%filename, \$value ); }
+					when ('search')      { $searchfunc->( \%filename, \$value ); }	# 検索対象(この単語を置き換える)
+					when ('type')        { $typefunc->( \%filename, \$value ); }	# 置換形式(ローワ・アッパー・キャメル形式・スネーク形式)
+					when ('place')       { $placefunc->( \%filename, \$value ); }	# 検索場所(次行)
+					when ('filesize')    { $filesizefunc->( \%filename, \$value ); }	# ファイル最大容量。
+					when ('extension')   { $extensionfunc->( \%filename, \$value ); }	# 拡張子
 					when ('hashNosize')  { die '読み取り専用値を書き換えるな'; }
 					when ('filecount')   { die '読み取り専用値を書き換えるな'; }
 #					default	{ say "その他の実行はない。" };
 				};
 			}
-			$argvOne = $value;
+			$argvOne = $value;	# 1つ目の引数保存。
 		}
 	}
 	my $size = keys %filename;
