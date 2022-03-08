@@ -79,6 +79,15 @@ my $typefunc = sub{
 	$" = $special;	# 戻す。
 };
 
+my $placefunc = sub{
+	my $hash = shift;
+	my $value = shift;
+
+	if( defined $$value and $$value =~ /\d/ ) {
+		$hash->{option}->{place} = $$value;
+	}
+};
+
 sub new() {
 	no warnings 'experimental::smartmatch';
 	# ユーザから渡されたファイルを全てハッシュに保存する。
@@ -114,7 +123,7 @@ sub new() {
 				given ($argvOne) {
 					when ('search')      { $searchfunc->( \%filename, \$value ); }
 					when ('type')        { $typefunc->( \%filename, \$value ); }
-					when ('place')       { $filename{option}->{place} = $value if defined $value }
+					when ('place')       { $placefunc->( \%filename, \$value ); }
 					when ('size')        { $filename{option}->{size} = $value if defined $value }
 					when ('hashNosize')  { die '読み取り専用値を書き換えるな'; }
 					when ('filecount')   { die '読み取り専用値を書き換えるな'; }
