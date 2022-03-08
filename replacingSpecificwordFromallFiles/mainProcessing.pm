@@ -22,6 +22,7 @@ sub help() {
 #	say "\tファイル内容の3行名：検索場所(当行0・前行-1・次行1など)。";
 #	say "\tファイル内容の4行名：読み込みファイル最大容量。";
 #	say "\t\t\t\tデフォルト値：ファイル最大容量上限なし(ファイルを一度に読み込むため、メモリ枯渇を防ぐために最大MB数を指定する)。";
+#	say "\tファイル内容の5行名：拡張子を指定する(それ以外のファイルを除外)。指定する場合はピリオドも含めること。";
 	say "以上。";
 }
 
@@ -121,17 +122,16 @@ my $extensionPartition = sub {
 	# 引数ファイルから必要な拡張子を持ったファイルを残し、他を削除する関数。
 	my $self = shift;
 
-	#say $self;
 	my $main = $self->{option}->{extension};	# オプションの中から拡張子を取り出す。
-	#say $main;
 	while( my( $index, $value ) = each ( %$self ) ) {
 		next if ref $value;
-		my ( $basename, $dirname, $ext ) = fileparse($value, qr/\..*$/ );
-		say "value：$value";
-		say "basename：$basename";
-		say "dirname：$dirname";
-		say "ext：$ext";
+		my ( $basename, $dirname, $ext ) = fileparse($value, qr/\..*$/ );	# ファイル名を拡張子より前の部分・ディレクトリ部分・拡張子部分に分ける。
+#		say "value：$value";
+#		say "basename：$basename";
+#		say "dirname：$dirname";
+#		say "ext：$ext";
 		if( "\L$main" eq "\L$ext" ) {
+			# 指定拡張子以外の場合、削除。
 			delete $self->{$index};
 		}
 	}
