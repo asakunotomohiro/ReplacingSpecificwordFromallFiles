@@ -45,6 +45,24 @@ my $snakeCase = sub{
 	'未実装';
 };
 
+my $searchfunc = sub{
+	my $hash = shift;
+	my $value = shift;
+
+	#say "サーチ：" . $hash->{option}->{search} , $$value;
+	#if( defined $$value and $$value =~ /[0-9a-zA-Z]+/ ) {
+	#if( $$value =~ /[0-9a-zA-Z]+/ ) {
+	#if( $$value =~ /[^あ]/ ) {
+	#if( $$value =~ /[^0-9a-zA-Z]+/ ) {
+	if( $$value =~ /[^\w]/ ) {
+		say "Perlでの識別子以外の文字設定不可：$$value";
+	}
+	else{
+		# Perlでの識別子に限り、検索単語として利用する(本来やりたいことズレているが、そこまでの乖離はないだろう)。
+		$hash->{option}->{search} = $$value;
+	}
+};
+
 sub new() {
 	no warnings 'experimental::smartmatch';
 	# ユーザから渡されたファイルを全てハッシュに保存する。
@@ -78,12 +96,12 @@ sub new() {
 			if( defined $argvOne ) {
 				# ここの処理が走る場合は、else文2回目の実行と言うこと。
 				given ($argvOne) {
-					when ('search')      { $filename{option}->{search} = $value if defined $value }
+					when ('search')      { $searchfunc->( \%filename, \$value ); }
 					when ('type')        { $filename{option}->{type} = $value if defined $value }
 					when ('place')       { $filename{option}->{place} = $value if defined $value }
 					when ('size')        { $filename{option}->{size} = $value if defined $value }
 					when ('hashNosize')  { die '読み取り専用値を書き換えるな'; }
-					when ('filecount')    { die '読み取り専用値を書き換えるな'; }
+					when ('filecount')   { die '読み取り専用値を書き換えるな'; }
 #					default	{ say "その他の実行はない。" };
 				};
 			}
@@ -94,6 +112,23 @@ sub new() {
 	$filename{option}->{filecount} = $size - $filename{option}->{hashNosize};	# 有効なファイル数の確認。
 
 	bless \%filename, $self;
+}
+
+sub optionShow() {
+	# インスタンス生成で保存したオプションを全て表示する。
+	my $self = shift;
+	my @argv = @_;
+	my @notKey = qw( lcc ucc hashNosize );
+
+	croak "引数にファイルを渡すこと。" unless defined(keys %$self);
+	my $special = $";	# バックアップ。
+	$" = '|';
+	foreach my $key ( keys %{$self->{option}} ) {
+		unless( $key =~ /@notKey/ ) {
+			say "$key->$self->{option}->{$key}" unless ref $self->{$key};
+		}
+	}
+	$" = $special;	# 戻す。
 }
 
 sub filenameShow() {
