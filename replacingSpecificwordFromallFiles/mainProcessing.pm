@@ -3,16 +3,13 @@ BEGIN { push @INC, "." };	# セキュリティ上大丈夫か？
 $VERSION = "0.001";
 use v5.24;
 use Carp;
-use File::Basename qw( fileparse );	# ファイル拡張子取りだし。
+use File::Basename qw( fileparse );	# ファイルから色々取得。
 
 sub help() {
 	my $self = shift;
 	# ここは、引数にヘルプの文言を付与された場合に呼び出される。
 
 	say "引数にファイルを渡すこと。";
-#	while( <DATA> ) {
-#		print;
-#	}
 	say "\tファイル内容には、置換前の文字列と置換後の文字列が含まれていること。";
 	say "\t置換対象は、'[ここにファイル名]'をプログラムファイルと同じ場所に作成しておくこと(未実装)。";
 #	say "\tもし、作成しない場合のデフォルト(置換対象)：xxx";
@@ -139,16 +136,16 @@ sub new() {
 	my $self = shift;
 	my @argv = @_;
 	my %filename = (
-			option => {
+			option => {	# オプション。
 				search => 'xxx',		# 検索対象(この単語を置き換える)
 				type   => 'lcc',		# 置換形式(ローワキャメル形式)アッパーキャメル形式の場合はucc・スネーク形式sc
 				lcc    => $camelcase,	# ローワキャメル形式関数。
 				ucc    => $pascalCase,	# アッパーキャメル形式関数。
 				place  => 1,			# 検索場所(次行)
 				filesize   => 0,		# ファイル最大容量。
-				extension => undef,		# 拡張子
+				extension  => undef,	# 拡張子
 				hashNosize => 0,		# 自動取得(このハッシュの初期容量)。手動書き換え不可。
-				filecount => 1,			# 自動取得(引数ファイル数)。手動書き換え不可。
+				filecount  => 1,		# 自動取得(引数ファイル数)。手動書き換え不可。
 			},
 		);	# これに保存する。
 	$self = ref($self) || $self;
@@ -156,14 +153,21 @@ sub new() {
 
 	my $argvOne;
 	while( my( $index, $value ) = each ( @argv )) {
+		# このループ処理は関数に追い出したい・・・。
 
 		if( -s -f $value ) {
 			$filename{$index} = "$value";
+		}
+		elsif( -d _ ) {
+			# ディレクトリ
+			push @argv, <$value/*>;
+			next;
 		}
 		elsif( -z _ ) {
 			warn "空ファイル($value)。";
 		}
 		else {
+			# この辺りは関数にまとめたい。
 			if( defined $argvOne ) {
 				# ここの処理が走る場合は、else文2回目の実行と言うこと。
 				given ($argvOne) {
