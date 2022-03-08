@@ -122,7 +122,6 @@ my $optExternalfilefunc = sub {
 		$self->{option}->{optfile} = $$value;
 		$self->{option}->{optionfiledo} = 1;	# 特に意味は無いのだが、とりあえず1にする。
 	}
-	#say "関数：$self->{option}->{optfile}";
 };
 
 my $extensionPartition = sub {
@@ -168,23 +167,20 @@ sub new() {
 	my $argvOne;
 	while( my( $index, $value ) = each ( @argv )) {
 		# このループ処理は関数に追い出したい・・・。
+		#	なにより、この処理方法は、オブジェクト指向プログラミングに反している。
 
 		if( -s -f $value and 'optfile' ne "$argvOne" ) {
-			#say "if $value";
 			$filename{$index} = "$value";
 		}
 		elsif( -d _ ) {
 			# ディレクトリ
-			#say "elsif -d $value";
 			push @argv, <$value/*>;
 			next;
 		}
 		elsif( -z -f _ ) {
-			#say "elsif -z -f $value";
 			warn "空ファイル($value)。";
 		}
 		else {
-			#say "else $value";
 			# この辺りは関数にまとめたい。
 			if( defined $argvOne ) {
 				# ここの処理が走る場合は、else文2回目の実行と言うこと。
@@ -223,8 +219,7 @@ sub optionShow() {
 	foreach my $key ( keys %{$self->{option}} ) {
 		unless( $key =~ /@notKey/ ) {
 			# リファレンスもしくは、空文字列の場合は、非表示。
-			#say "$key->$self->{option}->{$key}" if !(ref $self->{$key}) and (defined $self->{option}->{$key});
-			say "$key->$self->{option}->{optfile}";
+			say "$key->$self->{option}->{$key}" if !(ref $self->{$key}) and (defined $self->{option}->{$key});
 		}
 	}
 	$" = $special;	# 戻す。
@@ -287,6 +282,15 @@ sub run() {
 	my $self = shift;
 
 	warn "有効なファイルが存在しない。" . $self->help() unless $self->{option}->{filecount};
+	if( $self->{option}->{optionfiledo} == 1 ) {
+		# 引数で指定された設定ファイルを読み込む。
+		my $file_fh = $self->open( $self->{option}->{optfile} );
+		while( <$file_fh> ) {
+			chomp;
+			print;
+		}
+		close $file_fh;
+	}
 	while( my ($index, $filename) = each ( %$self ) ){
 		if( -f $filename and -s _ >= $self->{option}->{filesize} ) {
 			my $file_fh = $self->open($filename);

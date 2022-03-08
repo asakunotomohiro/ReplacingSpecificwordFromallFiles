@@ -12,7 +12,7 @@ sub main() {
 	#$object->filenameShow();
 	#say $object->filecount();
 	$object->optionShow();
-	#$object->run();
+	$object->run();
 }
 &main(@ARGV);
 
