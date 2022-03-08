@@ -3,7 +3,7 @@ BEGIN { push @INC, "." };	# セキュリティ上大丈夫か？
 $VERSION = "0.001";
 use v5.24;
 use Carp;
-use File::Basename qw( fileparse dirname );	# ファイルから色々取得。
+use File::Basename qw( fileparse );	# ファイルから色々取得。
 
 sub help() {
 	my $self = shift;
@@ -169,9 +169,10 @@ sub new() {
 			#my ( $basename, $dirname, $ext ) = fileparse($value);
 			my $ext = $filename{option}->{extension};	# 拡張子の取り出し。
 			#say "dir($value)：$dirname";
-			my @files = glob "$value/*$ext";
-			say "ディレクトリ名：$value(ファイル群：@files)";
-			#push @argv, @files;
+			#my @files = glob "$value/*$ext";
+			my @files = glob "$value/*";
+			#say "ディレクトリ名：$value(ファイル群：@files)";
+			push @argv, @files;
 			next;
 		}
 		else {
