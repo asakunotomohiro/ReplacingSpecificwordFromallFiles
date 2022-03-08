@@ -88,6 +88,15 @@ my $placefunc = sub{
 	}
 };
 
+my $filesizefunc = sub{
+	my $hash = shift;
+	my $value = shift;
+
+	if( defined $$value and $$value =~ /\d/ ) {
+		$hash->{option}->{filesize} = $$value;
+	}
+};
+
 sub new() {
 	no warnings 'experimental::smartmatch';
 	# ユーザから渡されたファイルを全てハッシュに保存する。
@@ -100,7 +109,7 @@ sub new() {
 				lcc    => $camelcase,	# ローワキャメル形式関数。
 				ucc    => $pascalCase,	# アッパーキャメル形式関数。
 				place  => 1,		# 検索場所(次行)
-				size   => 0,		# ファイル最大容量。
+				filesize   => 0,	# ファイル最大容量。
 				hashNosize => 0,	# 自動取得(このハッシュの初期容量)。手動書き換え不可。
 				filecount => 1,		# 自動取得(引数ファイル数)。手動書き換え不可。
 			},
@@ -124,7 +133,7 @@ sub new() {
 					when ('search')      { $searchfunc->( \%filename, \$value ); }
 					when ('type')        { $typefunc->( \%filename, \$value ); }
 					when ('place')       { $placefunc->( \%filename, \$value ); }
-					when ('size')        { $filename{option}->{size} = $value if defined $value }
+					when ('filesize')    { $filesizefunc->( \%filename, \$value ); }
 					when ('hashNosize')  { die '読み取り専用値を書き換えるな'; }
 					when ('filecount')   { die '読み取り専用値を書き換えるな'; }
 #					default	{ say "その他の実行はない。" };
@@ -214,7 +223,7 @@ sub run() {
 
 	warn "有効なファイルが存在しない。" . $self->help() unless $self->{option}->{filecount};
 	while( my ($index, $filename) = each ( %$self ) ){
-		if( -f $filename and -s _ >= $self->{option}->{size} ) {
+		if( -f $filename and -s _ >= $self->{option}->{filesize} ) {
 			my $file_fh = $self->open($filename);
 			my $type = "\L$self->{option}->{type}";
 			my @file = <$file_fh>;
