@@ -146,6 +146,8 @@ sub new() {
 				extension  => undef,	# 拡張子
 				hashNosize => 0,		# 自動取得(このハッシュの初期容量)。手動書き換え不可。
 				filecount  => 1,		# 自動取得(引数ファイル数)。手動書き換え不可。
+				optfile => undef,		# オプション変更用ファイル名指定。
+				optionfiledo => 0,		# オプション変更用ファイル有無設定。
 			},
 		);	# これに保存する。
 	$self = ref($self) || $self;
@@ -195,14 +197,15 @@ sub optionShow() {
 	# インスタンス生成で保存したオプションを全て表示する。
 	my $self = shift;
 	my @argv = @_;
-	my @notKey = qw( lcc ucc hashNosize );
+	my @notKey = qw( lcc ucc hashNosize optionfiledo );	# この項目は非表示。
 
 	croak "引数にファイルを渡すこと。" unless defined(keys %$self);
 	my $special = $";	# バックアップ。
 	$" = '|';
 	foreach my $key ( keys %{$self->{option}} ) {
 		unless( $key =~ /@notKey/ ) {
-			say "$key->$self->{option}->{$key}" unless ref $self->{$key};
+			# リファレンスもしくは、空文字列の場合は、非表示。
+			say "$key->$self->{option}->{$key}" if !(ref $self->{$key}) and (defined $self->{option}->{$key});
 		}
 	}
 	$" = $special;	# 戻す。
