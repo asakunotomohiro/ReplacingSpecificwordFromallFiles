@@ -49,16 +49,12 @@ my $searchfunc = sub{
 	my $hash = shift;
 	my $value = shift;
 
-	#say "サーチ：" . $hash->{option}->{search} , $$value;
-	#if( defined $$value and $$value =~ /[0-9a-zA-Z]+/ ) {
-	#if( $$value =~ /[0-9a-zA-Z]+/ ) {
-	#if( $$value =~ /[^あ]/ ) {
-	#if( $$value =~ /[^0-9a-zA-Z]+/ ) {
-	if( $$value =~ /[^\w]/ ) {
+	if( defined $$value and $$value =~ /[^\w]/ ) {
 		say "Perlでの識別子以外の文字設定不可：$$value";
 	}
 	else{
 		# Perlでの識別子に限り、検索単語として利用する(本来やりたいことズレているが、そこまでの乖離はないだろう)。
+		# ※マイナス数字なども不可になる。
 		$hash->{option}->{search} = $$value;
 	}
 };
@@ -73,7 +69,7 @@ my $typefunc = sub{
 
 	my $special = $";	# バックアップ。
 	$" = '|';
-	if( "\L$$value" =~ /\L@typeKey/ ) {
+	if( defined $$value and "\L$$value" =~ /\L@typeKey/ ) {
 		$hash->{option}->{type} = "\L$$value";
 	}
 	$" = $special;	# 戻す。
