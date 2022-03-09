@@ -142,6 +142,25 @@ my $extensionPartition = sub {
 	}
 };
 
+#sub optionfileTakein() {
+my $optionfileTakein = sub {
+	# 外部ファイルからオプション内容を取り込む。
+	my $hashfile = shift;
+
+	my $filename = $hashfile->{option}->{configfile};	# 設定ファイル。
+	open my $file_fh, '<', $filename or die "$filenameのファイルオープン失敗($!)";
+	close $file_fh;
+	my $jsondata = optionRead($hashfile);	# 現在の設定内容取得(ここを書き換える)。
+	my $optiondata = optionRead($filename);	# 設定ファイルのJSONデータ(書き換えネタ)。
+	my @key_optiondata = keys %$optiondata;
+	foreach my $key ( @key_optiondata) {
+		$jsondata->{$key} = $optiondata->{$key};	# 書き換え実施。
+	}
+#	say '-' x 30;
+#	optionRead($hashfile);	# 書き換え後。
+#	say '-' x 30;
+};
+
 sub new() {
 	no warnings 'experimental::smartmatch';
 	# ユーザから渡されたファイルを全てハッシュに保存する。
@@ -156,15 +175,20 @@ sub new() {
 				place  => 1,			# 検索場所(次行)
 				filesize   => 0,		# ファイル最大容量。
 				extension  => undef,	# 拡張子
-				hashNosize => 0,		# 自動取得(このハッシュの初期容量)。手動書き換え不可。
+				hashNosize => 0,		# 自動取得(このハッシュの初期容量)。手動書き換え不可。基本1が設定される。
 				filecount  => 1,		# 自動取得(引数ファイル数)。手動書き換え不可。
 				optfile => undef,		# オプション変更用ファイル名指定。
 				optionfiledo => 0,		# オプション変更用ファイル有無設定(使う場合1・使わない場合0)。実質このオプション使っていない。
 				configfile => 'config.ini',	# ローカル用オプションファイル。
-				optionExclusionlist => [ qw( lcc ucc hashNosize optionfiledo optionExclusionlist ) ],	# 一般公開しないオプション一覧。
+				optionExclusionlist => [ qw( lcc ucc hashNosize filecount optionfiledo optionExclusionlist configfilefunc ) ],	# 一般公開しないオプション一覧。
+				configfilefunc => $optionfileTakein,	# ローカル用オプションファイル取り込み用関数。
 			},
 		);	# これに保存する。
 	$self = ref($self) || $self;
+	#optionfileTakein( \%filename ) if -f $filename{option}->{configfile};	# 設定ファイルがある場合、読み込む。
+	#optionfileTakein( $self ) if -f $filename{option}->{configfile};	# 設定ファイルがある場合、読み込む。
+	#optionfileTakein($filename{option}->{configfile}) if -f $filename{option}->{configfile};	# 設定ファイルがある場合、読み込む。
+	$filename{option}->{configfilefunc}->( \%filename ) if -f $filename{option}->{configfile};	# 設定ファイルがある場合、読み込む。
 	$filename{option}->{hashNosize} = keys %filename;
 
 	my $argvOne;
@@ -197,6 +221,8 @@ sub new() {
 					when ('hashNosize')  { die '読み取り専用値を書き換えるな'; }
 					when ('filecount')   { die '読み取り専用値を書き換えるな'; }
 					when ('optionfiledo'){ die '読み取り専用値を書き換えるな'; }
+					when ('optionExclusionlist')  { die '読み取り専用値を書き換えるな'; }
+					when ('configfilefunc')  { die '読み取り専用値を書き換えるな'; }
 #					default	{ say "その他の実行はない。" };
 				};
 			}
@@ -214,7 +240,6 @@ sub optionShow() {
 	# インスタンス生成で保存したオプションを全て表示する。
 	my $self = shift;
 	my @argv = @_;
-	#my @notKey = @{$self->{option}->{optionExclusionlist}};	# この項目は非表示。
 	my @notKey = @{$self->{option}->{optionExclusionlist}};	# この項目は非表示。
 
 	croak "引数にファイルを渡すこと。" unless defined(keys %$self);
@@ -248,7 +273,7 @@ sub filecount() {
 	return $self->{option}->{filecount};
 }
 
-sub open() {
+sub openfile() {
 	# 引数のファイルを開く(1ファイルのみ)。
 	my $self = shift;
 	my $filename = shift;
@@ -268,7 +293,19 @@ sub filemove() {
 sub optionRead() {
 	# オプション内容をファイルから読み込む。
 	my $self = shift;
-	my $optionfile = $self->{option}->{configfile};	# オプションファイル(読み込み)対象。
+	my $optionfile;
+#	my $optionfile = $self->{option}->{configfile} if defined(ref $self);	# オプションファイル(読み込み)対象。
+#	say "optionfile：$optionfile";
+#	my $optionfile = $self unless defined(ref $self);	# リファレンスでない場合、$selfにファイル名があるため、移し替える。
+#	say "optionfile：$optionfile";
+
+	#if( defined(ref $self) ) {	# オプションファイル(読み込み)対象。
+	if( ref $self ) {	# オプションファイル(読み込み)対象。
+		$optionfile = $self->{option}->{configfile};
+	}
+	else{
+		$optionfile = $self;
+	}
 
 	open my $file_fh, '<', $optionfile
 		or die "$optionfileファイルオープン失敗($!)。";
@@ -277,16 +314,18 @@ sub optionRead() {
 
 	my $json = JSON::PP->new();
 	my $input = $json->utf8(0)->decode( "@file" );	# JSONデータとして読み込み。
-	while( my( $key, $value ) = each ( %$input )) {
-		say "$key->$value";
-	}
+	#while( my( $key, $value ) = each ( %$input )) {
+	#	say "$key->$value";
+	#}
+	return $input;
 }
 
 sub optionWrite() {
 	# オプション内容をファイルに書き出す。
 	my $self = shift;
-	my @notKey = @{$self->{option}->{optionExclusionlist}};	# この項目は非表示。
+	my @notKey = @{$self->{option}->{optionExclusionlist}};
 	push @notKey, qw( filesize configfile );	# この項目はハッシュから削除。
+
 	my %copy = %{$self->{option}};
 	map{ delete $copy{$_} } @notKey;
 	my $optionfile = $self->{option}->{configfile};	# オプションファイル(書き込み)対象。
@@ -322,7 +361,7 @@ sub run() {
 	warn "有効なファイルが存在しない。" . $self->help() unless $self->{option}->{filecount};
 	if( $self->{option}->{optionfiledo} == 1 ) {
 		# 引数で指定された設定ファイルを読み込む。
-		my $file_fh = $self->open( $self->{option}->{optfile} );
+		my $file_fh = $self->openfile( $self->{option}->{optfile} );
 		while( <$file_fh> ) {
 			chomp;
 			print;
@@ -331,7 +370,7 @@ sub run() {
 	}
 	while( my ($index, $filename) = each ( %$self ) ){
 		if( -f $filename and -s _ >= $self->{option}->{filesize} ) {
-			my $file_fh = $self->open($filename);
+			my $file_fh = $self->openfile($filename);
 			my $type = "\L$self->{option}->{type}";
 			my @file = <$file_fh>;
 			foreach my $line ( 0 .. $#file ) {

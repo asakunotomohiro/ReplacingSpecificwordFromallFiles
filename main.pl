@@ -15,8 +15,8 @@ sub main() {
 	#$object->optionShow();
 	#say '-' x 30;
 	#$object->run();
-	$object->optionWrite();
-	$object->optionRead();
+	#$object->optionWrite();
+	#$object->optionRead();
 }
 &main(@ARGV);
 
