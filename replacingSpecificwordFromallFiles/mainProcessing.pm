@@ -3,6 +3,7 @@ BEGIN { push @INC, "." };	# セキュリティ上大丈夫か？
 $VERSION = "0.001";
 use v5.24;
 use Carp;
+use JSON::PP;	# オプションデータの書き出しもしくは読み込み。
 use File::Basename qw( fileparse );	# ファイルから色々取得。
 
 sub help() {
@@ -259,6 +260,28 @@ sub filemove() {
 	my $filename = shift;
 
 	rename $filename, "$filename.bak";
+}
+
+sub optionWrite() {
+	# オプション内容をファイルに書き出す。
+	my $self = shift;
+	my @notKey = qw( lcc ucc hashNosize optionfiledo filesize );	# この項目は削除。
+	my $optionfile = 'config.ini';
+	my %copy = %{$self->{option}};
+	map{ delete $copy{$_} } @notKey;
+#	say '-' x 30;
+#	while( my ($key, $value) = each (%copy)) {
+#		say "$key->$value";
+#	}
+
+	my $json = JSON::PP->new();
+#	say 'ハッシュ？' . %{$self->{option}};
+	my $output = $json->utf8(0)->pretty->canonical->encode( \%copy );	# JSONデータに書き換え実施。
+	say $output;
+	open my $file_fh, '>', $optionfile
+		or die "$optionfileファイルオープン失敗($!)。";
+	print $file_fh $output;
+	close $file_fh;
 }
 
 sub write() {
