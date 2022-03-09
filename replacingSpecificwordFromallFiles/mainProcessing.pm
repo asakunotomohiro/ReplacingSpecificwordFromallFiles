@@ -262,25 +262,36 @@ sub filemove() {
 	rename $filename, "$filename.bak";
 }
 
+my $optionfile = 'config.ini';	# オプションファイル(読み込み・書き込み)対象。オブジェクト指向プログラミングに反するため、外出しをどうにかしたい。
+sub optionRead() {
+	# オプション内容をファイルから読み込む。
+	my $self = shift;
+
+	open my $file_fh, '<', $optionfile
+		or die "$optionfileファイルオープン失敗($!)。";
+	my @file = <$file_fh>;
+	close $file_fh;
+
+	my $json = JSON::PP->new();
+	my $input = $json->utf8(0)->decode( "@file" );	# JSONデータとして読み込み。
+	say '-' x 30;
+	while( my( $key, $value ) = each ( %$input )) {
+		say "$key->$value";
+	}
+}
+
 sub optionWrite() {
 	# オプション内容をファイルに書き出す。
 	my $self = shift;
-	my @notKey = qw( lcc ucc hashNosize optionfiledo filesize );	# この項目は削除。
-	my $optionfile = 'config.ini';
+	my @notKey = qw( lcc ucc hashNosize optionfiledo filesize );	# この項目はハッシュから削除。
 	my %copy = %{$self->{option}};
 	map{ delete $copy{$_} } @notKey;
-#	say '-' x 30;
-#	while( my ($key, $value) = each (%copy)) {
-#		say "$key->$value";
-#	}
 
 	my $json = JSON::PP->new();
-#	say 'ハッシュ？' . %{$self->{option}};
 	my $output = $json->utf8(0)->pretty->canonical->encode( \%copy );	# JSONデータに書き換え実施。
-	say $output;
 	open my $file_fh, '>', $optionfile
 		or die "$optionfileファイルオープン失敗($!)。";
-	print $file_fh $output;
+	print $file_fh $output;	# ファイルへの書き出し実施。
 	close $file_fh;
 }
 
