@@ -160,6 +160,8 @@ sub new() {
 				filecount  => 1,		# 自動取得(引数ファイル数)。手動書き換え不可。
 				optfile => undef,		# オプション変更用ファイル名指定。
 				optionfiledo => 0,		# オプション変更用ファイル有無設定(使う場合1・使わない場合0)。実質このオプション使っていない。
+				configfile => 'config.ini',	# ローカル用オプションファイル。
+				optionExclusionlist => [ qw( lcc ucc hashNosize optionfiledo optionExclusionlist ) ],	# 一般公開しないオプション一覧。
 			},
 		);	# これに保存する。
 	$self = ref($self) || $self;
@@ -212,7 +214,8 @@ sub optionShow() {
 	# インスタンス生成で保存したオプションを全て表示する。
 	my $self = shift;
 	my @argv = @_;
-	my @notKey = qw( lcc ucc hashNosize optionfiledo );	# この項目は非表示。
+	#my @notKey = @{$self->{option}->{optionExclusionlist}};	# この項目は非表示。
+	my @notKey = @{$self->{option}->{optionExclusionlist}};	# この項目は非表示。
 
 	croak "引数にファイルを渡すこと。" unless defined(keys %$self);
 	my $special = $";	# バックアップ。
@@ -262,10 +265,10 @@ sub filemove() {
 	rename $filename, "$filename.bak";
 }
 
-my $optionfile = 'config.ini';	# オプションファイル(読み込み・書き込み)対象。オブジェクト指向プログラミングに反するため、外出しをどうにかしたい。
 sub optionRead() {
 	# オプション内容をファイルから読み込む。
 	my $self = shift;
+	my $optionfile = $self->{option}->{configfile};	# オプションファイル(読み込み)対象。
 
 	open my $file_fh, '<', $optionfile
 		or die "$optionfileファイルオープン失敗($!)。";
@@ -274,7 +277,6 @@ sub optionRead() {
 
 	my $json = JSON::PP->new();
 	my $input = $json->utf8(0)->decode( "@file" );	# JSONデータとして読み込み。
-	say '-' x 30;
 	while( my( $key, $value ) = each ( %$input )) {
 		say "$key->$value";
 	}
@@ -283,9 +285,11 @@ sub optionRead() {
 sub optionWrite() {
 	# オプション内容をファイルに書き出す。
 	my $self = shift;
-	my @notKey = qw( lcc ucc hashNosize optionfiledo filesize );	# この項目はハッシュから削除。
+	my @notKey = @{$self->{option}->{optionExclusionlist}};	# この項目は非表示。
+	push @notKey, qw( filesize configfile );	# この項目はハッシュから削除。
 	my %copy = %{$self->{option}};
 	map{ delete $copy{$_} } @notKey;
+	my $optionfile = $self->{option}->{configfile};	# オプションファイル(書き込み)対象。
 
 	my $json = JSON::PP->new();
 	my $output = $json->utf8(0)->pretty->canonical->encode( \%copy );	# JSONデータに書き換え実施。

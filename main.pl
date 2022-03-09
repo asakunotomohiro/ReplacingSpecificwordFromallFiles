@@ -11,9 +11,11 @@ sub main() {
 	$object->help() unless @ARGV;
 	#$object->filenameShow();
 	#say $object->filecount();
+	#say '-' x 30;
 	#$object->optionShow();
+	#say '-' x 30;
 	#$object->run();
-	#$object->optionWrite();
+	$object->optionWrite();
 	$object->optionRead();
 }
 &main(@ARGV);
