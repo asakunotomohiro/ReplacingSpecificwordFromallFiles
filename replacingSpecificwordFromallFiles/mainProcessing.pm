@@ -112,7 +112,6 @@ my $extensionfunc = sub{
 		say "拡張子指定はピリオドから始めること：$$value(また、Perlでの識別子以外も不可)";
 		# 連続ピリオドの拡張子指定も不可(他にも制限があるかも？)。
 	}
-	#say $hash->{option}->{extension} . '[extensionfunc関数]';
 };
 
 my $optExternalfilefunc = sub {
@@ -126,12 +125,11 @@ my $optExternalfilefunc = sub {
 	}
 };
 
-#my $extensionPartition = sub {
 sub extensionPartition() {
 	# 引数ファイルから必要な拡張子を持ったファイルを残し、他を削除する関数。
 	#	拡張子と思わしき部分全てが一致しておく必要がある。
-	#	例）hoge.txt　⇒ .txt　が拡張子。
-	#	例）hoge.txt.bak　⇒ .txt.bak　が拡張子(.bakでは検索に掛からない)。
+	#		例）hoge.txt　⇒ .txt　が拡張子。
+	#		例）hoge.txt.bak　⇒ .txt.bak　が拡張子(.bakでは検索に掛からない)。
 	my $self = shift;
 
 	my $main = $self->{option}->{extension};	# オプションの中から拡張子を取り出す。
@@ -145,11 +143,7 @@ sub extensionPartition() {
 			delete $self->{$index};
 		}
 	}
-#say "拡張子検査：extensionPartition関数";
-#	while( my( $key, $value ) = each ( %$self )) {
-#		say "$key->$value";
-#	}
-};
+}
 
 my $switchOptionset = sub {
 	no warnings 'experimental::smartmatch';
@@ -158,17 +152,34 @@ my $switchOptionset = sub {
 	my $value = shift;
 
 	given ($argvOne) {
-		when ('search')      { $searchfunc->( $filename, \$value ); }	# 検索対象(この単語を置き換える)
-		when ('type')        { $typefunc->( $filename, \$value ); }	# 置換形式(ローワ・アッパー・キャメル形式・スネーク形式)
-		when ('place')       { $placefunc->( $filename, \$value ); }	# 検索場所(次行)
-		when ('filesize')    { $filesizefunc->( $filename, \$value ); }	# ファイル最大容量。
-		when ('extension')   { $extensionfunc->( $filename, \$value ); }	# 拡張子
-		when ('optfile')     { $optExternalfilefunc->( $filename, \$value ); }	# オプション変更を引数からファイルを指定する。
-		when ('hashNosize')  { die '読み取り専用値を書き換えるな'; }
-		when ('filecount')   { die '読み取り専用値を書き換えるな'; }
-		when ('optionfiledo'){ die '読み取り専用値を書き換えるな'; }
-		when ('optionExclusionlist')  { die '読み取り専用値を書き換えるな'; }
-		when ('configfilefunc')  { die '読み取り専用値を書き換えるな'; }
+		when ('search')
+				# 検索対象(この単語を置き換える)
+				{ $searchfunc->( $filename, \$value ); }
+		when ('type')
+				# 置換形式(ローワ・アッパー・キャメル形式・スネーク形式)
+				{ $typefunc->( $filename, \$value ); }
+		when ('place')
+				# 検索場所(次行)
+				{ $placefunc->( $filename, \$value ); }
+		when ('filesize')
+				# ファイル最大容量。
+				{ $filesizefunc->( $filename, \$value ); }
+		when ('extension')
+				# 拡張子
+				{ $extensionfunc->( $filename, \$value ); }
+		when ('optfile')
+				# オプション変更を引数からファイルを指定する。
+				{ $optExternalfilefunc->( $filename, \$value ); }
+		when ('hashNosize')
+				{ die '読み取り専用値を書き換えるな'; }
+		when ('filecount')
+				{ die '読み取り専用値を書き換えるな'; }
+		when ('optionfiledo')
+				{ die '読み取り専用値を書き換えるな'; }
+		when ('optionExclusionlist')
+				{ die '読み取り専用値を書き換えるな'; }
+		when ('configfilefunc')
+				{ die '読み取り専用値を書き換えるな'; }
 #		default	{ say "その他の実行はない。" };
 	};
 };
@@ -178,8 +189,6 @@ my $optionfileTakein = sub {
 	my $hashfile = shift;
 
 	my $filename = $hashfile->{option}->{configfile};	# 設定ファイル。
-	#open my $file_fh, '<', $filename or die "$filenameのファイルオープン失敗($!)";
-	#close $file_fh;
 	#my $jsondata = optionRead($hashfile);	# 現在の設定内容取得(ここを書き換える)。
 	my $optiondata = optionRead($filename);	# 設定ファイルのJSONデータ(書き換えネタ)。
 	my @key_optiondata = keys %$optiondata;
@@ -220,7 +229,7 @@ sub new() {
 	my $argvOne;
 	while( my( $index, $value ) = each ( @argv )) {
 		# このループ処理は関数に追い出したい・・・。
-		#	なにより、この処理方法は、オブジェクト指向プログラミングに反している。
+		#	なにより、この処理方法は、オブジェクト指向プログラミングに反している(ここだけに限らないが)。
 
 		if( -s -f $value and 'optfile' ne "$argvOne" ) {
 			$filename{$index} = "$value";
@@ -243,7 +252,6 @@ sub new() {
 	}
 	my $size = keys %filename;
 	$filename{option}->{filecount} = $size - $filename{option}->{hashNosize};	# 有効なファイル数の確認。
-	#$extensionPartition->(\%filename);	# 拡張子検査。
 	&extensionPartition(\%filename);	# 拡張子検査。
 
 	bless \%filename, $self;
@@ -377,12 +385,6 @@ sub run() {
 	warn "有効なファイルが存在しない。" . $self->help() unless $self->{option}->{filecount};
 	if( $self->{option}->{optionfiledo} == 1 ) {
 		# 引数で指定された設定ファイルを読み込む。
-		#my $file_fh = $self->openfile( $self->{option}->{optfile} );
-		#while( <$file_fh> ) {
-		#	chomp;
-		#	print;
-		#}
-		#close $file_fh;
 		my $optiondata = $self->optionRead( $self->{option}->{optfile} );	# 設定ファイルのJSONデータ(書き換えネタ)。
 		my @key_optiondata = keys %$optiondata;
 		foreach my $key ( @key_optiondata) {
