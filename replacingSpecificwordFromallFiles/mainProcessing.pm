@@ -1,13 +1,10 @@
-package perlasakuno::replacingSpecificwordFromallFiles;
-BEGIN { push @INC, "." };	# セキュリティ上大丈夫か？
-$VERSION = "0.001";
-use v5.24;
-
-package replacingSpecificwordFromallFiles::process;
-
 package parent::process;
+BEGIN { push @INC, "." };	# セキュリティ上大丈夫か？
+$VERSION = "0.800";
+use v5.24;
 use Carp;
-use File::Spec;
+use JSON::PP;	# オプションデータの書き出しもしくは読み込み。
+use File::Basename qw( fileparse );	# ファイルから色々取得。
 
 sub help() {
 	my $self = shift;
@@ -15,14 +12,15 @@ sub help() {
 
 	say "引数にファイルを渡すこと。";
 	say "\tファイル内容には、置換前の文字列と置換後の文字列が含まれていること。";
-	say "\t置換対象は、''をプログラムファイルと同じ場所に作成しておくこと。";
-	say "\tもし、作成しない場合のデフォルト(置換対象)：xxx";
-	say "\tもし、作成しない場合のデフォルト(置換形式)：キャメル形式(1単語目の頭文字は小文字・2単語目以降の頭文字大文字)";
-	say "\tファイル内容の1行名：検索対象。　※未実装(デフォルト値：xxx)";
-	say "\tファイル内容の2行名：置換形式。　※未実装(デフォルト値：キャメル形式)";
-	say "\tファイル内容の3行名：検索場所(当行0・前行-1・次行1など)。　※未実装(全て大文字になっている単語を取り出す。要は関数名)";
-	say "\tファイル内容の4行名：読み込みファイル最大容量(ファイルを一度に読み込むため、メモリ枯渇を防ぐために最大MB数を指定する)。　※未実装";
-	say "\t\t\tデフォルト値：ファイル最大容量上限なし。";
+	say "\t置換対象は、'$self->{option}->{configfile}'をプログラムファイルと同じ場所に作成しておくこと。";
+#	say "\tもし、作成しない場合のデフォルト(置換対象)：xxx";
+#	say "\tもし、作成しない場合のデフォルト(置換形式)：キャメル形式(1単語目の頭文字は小文字・2単語目以降の頭文字大文字)";
+#	say "\tファイル内容の1行名：検索対象(デフォルト値：xxx)。";
+#	say "\tファイル内容の2行名：置換形式(デフォルト値：キャメル形式)。";
+#	say "\tファイル内容の3行名：検索場所(当行0・前行-1・次行1など)。";
+#	say "\tファイル内容の4行名：読み込みファイル最大容量。";
+#	say "\t\t\t\tデフォルト値：ファイル最大容量上限なし(ファイルを一度に読み込むため、メモリ枯渇を防ぐために最大MB数を指定する)。";
+#	say "\tファイル内容の5行名：拡張子を指定する(それ以外のファイルを除外)。指定する場合はピリオドも含めること。";
 	say "以上。";
 }
 
@@ -32,7 +30,7 @@ my $pascalCase = sub{
 	my @split = split /_/, shift;
 	my $ret;
 	foreach my $value ( @split ){
-		# 頭文字のみ大文字。
+		# 頭文字のみ大文字(のこりは小文字)。
 		$ret .= "\u\L$value";
 	}
 	return $ret
@@ -41,83 +39,241 @@ my $pascalCase = sub{
 my $camelcase = sub{
 	# スネーク形式をローワキャメル形式に変換する。
 	#	例）ABC_DEF	⇒	abcDef
-	#my @split = split /_/, shift;
-	#say "引数：@_";
 	my $ret = $pascalCase->(@_);
-#	while( my( $index, $value) = each ( @split ) ){
-#		if( $index == 0 ) {
-#			# 先頭単語は全て小文字。
-#			$ret .= "\L$value";
-#		}
-#		else{
-#			# 頭文字のみ大文字。
-#			$ret .= "\u\L$value";
-#		}
-#	}
-	"\l$ret"
+	"\l$ret"	# 頭文字だけを小文字にする。
+};
+
+my $snakeCase = sub{
+	# キャメル形式をスネーク形式に変換する。
+	'未実装';
+};
+
+my $searchfunc = sub{
+	# 設定値：検索単語。
+	my $hash = shift;
+	my $value = shift;
+
+	if( defined $$value and $$value =~ /[^\w]/ ) {
+		say "Perlでの識別子以外の文字設定不可：$$value";
+	}
+	else{
+		# Perlでの識別子に限り、検索単語として利用する(本来やりたいことズレているが、そこまでの乖離はないだろう)。
+		# ※マイナス数字なども不可になる。
+		$hash->{option}->{search} = $$value;
+	}
+};
+
+my $typefunc = sub{
+	# 設定値：置換形式。
+	my $hash = shift;
+	my $value = shift;
+	my @typeKey = qw( lcc ucc sc );	# この中に含まれている単語のみ許可する。
+		# lcc	ローワキャメル形式
+		# ucc	アッパーキャメル形式
+		# sc	スネーク形式(未実装)
+
+	my $special = $";	# バックアップ。
+	$" = '|';
+	if( defined $$value and "\L$$value" =~ /\L@typeKey/ ) {
+		$hash->{option}->{type} = "\L$$value";
+	}
+	$" = $special;	# 戻す。
+};
+
+my $placefunc = sub{
+	# 設定値：検索対象行。
+	my $hash = shift;
+	my $value = shift;
+
+	if( defined $$value and $$value =~ /\d/ ) {
+		$hash->{option}->{place} = $$value;
+	}
+};
+
+my $filesizefunc = sub{
+	# 設定値：ファイルサイズ。
+	my $hash = shift;
+	my $value = shift;
+
+	if( defined $$value and $$value =~ /\d/ ) {
+		$hash->{option}->{filesize} = $$value;
+	}
+};
+
+my $extensionfunc = sub{
+	# 設定値：拡張子。
+	my $hash = shift;
+	my $value = shift;
+
+	if( defined $$value and $$value =~ /\A(\.\w+)+\z/ ) {
+		$hash->{option}->{extension} = "\L$$value";
+	}
+	else{
+		say "拡張子指定はピリオドから始めること：$$value(また、Perlでの識別子以外も不可)";
+		# 連続ピリオドの拡張子指定も不可(他にも制限があるかも？)。
+	}
+};
+
+my $optExternalfilefunc = sub {
+	# オプション変更を引数ファイルから読み込めるようにするための関数。
+	my $self = shift;
+	my $value = shift;	# 外部ファイル名。
+
+	if( -s -f $$value ) {
+		$self->{option}->{optfile} = $$value;
+		$self->{option}->{optionfiledo} = 1;	# 特に意味は無いのだが、とりあえず1にする。
+	}
+	else{
+		say "$$valueファイルなし。";
+	}
+};
+
+my $switchOptionset = sub {
+	no warnings 'experimental::smartmatch';
+	my $argvOne = shift;
+	my $filename = shift;
+	my $value = shift;
+
+	given ($argvOne) {
+		when ('search')
+				# 検索対象(この単語を置き換える)
+				{ $searchfunc->( $filename, \$value ); }
+		when ('type')
+				# 置換形式(ローワ・アッパー・キャメル形式・スネーク形式)
+				{ $typefunc->( $filename, \$value ); }
+		when ('place')
+				# 検索場所(次行)
+				{ $placefunc->( $filename, \$value ); }
+		when ('filesize')
+				# ファイル最大容量。
+				{ $filesizefunc->( $filename, \$value ); }
+		when ('extension')
+				# 拡張子
+				{ $extensionfunc->( $filename, \$value ); }
+		when ('optfile')
+				# オプション変更を引数からファイルを指定する。
+				{ $optExternalfilefunc->( $filename, \$value ); }
+		when ('hashNosize')
+				{ die '読み取り専用値を書き換えるな'; }
+		when ('filecount')
+				{ die '読み取り専用値を書き換えるな'; }
+		when ('optionfiledo')
+				{ die '読み取り専用値を書き換えるな'; }
+		when ('optionExclusionlist')
+				{ die '読み取り専用値を書き換えるな'; }
+		when ('configfilefunc')
+				{ die '読み取り専用値を書き換えるな'; }
+#		default	{ say "その他の実行はない。" };
+	};
+};
+
+my $optionfileTakein = sub {
+	# 外部ファイルからオプション内容を取り込む。
+	my $hashfile = shift;
+
+	my $filename = $hashfile->{option}->{configfile};	# 設定ファイル。
+	my $optiondata = optionRead($filename);	# 設定ファイルのJSONデータ(書き換えネタ)。
+	my @key_optiondata = keys %$optiondata;
+	foreach my $key ( @key_optiondata) {
+		$switchOptionset->($key, $hashfile, $optiondata->{$key});
+	}
+
+	return %$hashfile;
 };
 
 sub new() {
-	no warnings 'experimental::smartmatch';
 	# ユーザから渡されたファイルを全てハッシュに保存する。
 	my $self = shift;
 	my @argv = @_;
 	my %filename = (
-			option => {
-				search => 'xxx',	# 検索対象(この単語を置き換える)
-				type   => 'lcc',	# 置換形式(ローワキャメル形式)アッパーキャメル形式の場合はucc・スネーク形式sc
+			option => {	# オプション	←☆optionの中身は参照渡しされないの？
+				search => 'xxx',		# 検索対象(この単語を置き換える)
+				type   => 'lcc',		# 置換形式(ローワキャメル形式)アッパーキャメル形式の場合はucc・スネーク形式sc
 				lcc    => $camelcase,	# ローワキャメル形式関数。
 				ucc    => $pascalCase,	# アッパーキャメル形式関数。
-				place  => 1,		# 検索場所(次行)
-				size   => 0,		# ファイル最大容量。
-				hashNosize => 0,	# 自動取得(このハッシュの初期容量)。手動書き換え不可。
-				hashSize => 1,		# 自動取得(引数ファイル数)。手動書き換え不可。
+				place  => 1,			# 検索場所(次行)
+				filesize   => 0,		# ファイル最大容量。
+				extension  => undef,	# 拡張子
+				hashNosize => 0,		# 自動取得(このハッシュの初期容量)。手動書き換え不可。基本1が設定される。
+				filecount  => 1,		# 自動取得(引数ファイル数)。手動書き換え不可。
+				optfile => undef,		# オプション変更用ファイル名指定。
+				optionfiledo => 0,		# オプション変更用ファイル有無設定(使う場合1・使わない場合0)。実質このオプション使っていない。
+				configfile => 'config.ini',	# ローカル用オプションファイル。
+				optionExclusionlist => [ qw( lcc ucc hashNosize filecount optionfiledo optionExclusionlist configfilefunc ) ],	# 一般公開しないオプション一覧。
+				configfilefunc => $optionfileTakein,	# ローカル用オプションファイル取り込み用関数。
 			},
 		);	# これに保存する。
 	$self = ref($self) || $self;
-	#say "@argv";
+	$filename{option}->{configfilefunc}->( \%filename ) if -f $filename{option}->{configfile};	# 設定ファイルがある場合、読み込む。
 	$filename{option}->{hashNosize} = keys %filename;
-	#say $filename{option}->{hashNosize};
 
 	my $argvOne;
 	while( my( $index, $value ) = each ( @argv )) {
+		# このループ処理は関数に追い出したい・・・。
+		#	なにより、この処理方法は、オブジェクト指向プログラミングに反している(ここだけに限らないが)。
 
-		if( -s -f $value ) {
-			#$value = File::Spec->rel2abs($value);
+		if( -s -f $value and 'optfile' ne "$argvOne" ) {
 			$filename{$index} = "$value";
-			#say "$index, $value.";
 		}
-		elsif( -z _ ) {
+		elsif( -d _ ) {
+			# ディレクトリ
+			push @argv, <$value/*>;
+			next;
+		}
+		elsif( -z -f _ ) {
 			warn "空ファイル($value)。";
 		}
 		else {
 			if( defined $argvOne ) {
-				# ここの処理が走る場合は、else文2回目の実行と言うこと。
-				given ($argvOne) {
-					when ('search')      { $filename{option}->{search} = $value if defined $value }
-					when ('type')        { $filename{option}->{type} = $value if defined $value }
-					when ('place')       { $filename{option}->{place} = $value if defined $value }
-					when ('size')        { $filename{option}->{size} = $value if defined $value }
-					#when ('hashNosize')  { $filename{option}->{hashNosize} = $value }
-					when ('hashNosize')  { die '読み取り専用値を書き換えるな'; }
-					#when ('hashSize')    { $filename{option}->{hashSize} = $value }
-					when ('hashSize')    { die '読み取り専用値を書き換えるな'; }
-#					default	{ say "その他の実行はない。" };
-				};
+				# ここの処理が走るのは、else文2回目の実行と言うこと(引数2つ目)。
+				$switchOptionset->($argvOne, \%filename, $value);
 			}
-			$argvOne = $value;
+			$argvOne = $value;	# 1つ目の引数保存。
 		}
 	}
-	#say "$filename{0}";
-	#say "$filename{1}";
-	#say keys %filename;
 	my $size = keys %filename;
-	#say $size;
-	#say '型：' . $filename{option}->{type};
-	#say 'hashNosize：' . $filename{option}->{hashNosize};
-	$filename{option}->{hashSize} = $size - $filename{option}->{hashNosize};
+	$filename{option}->{filecount} = $size - $filename{option}->{hashNosize};	# 有効なファイル数の確認。
+	&extensionPartition(\%filename);	# 拡張子検査。
 
 	bless \%filename, $self;
+}
+
+sub extensionPartition() {
+	# 引数ファイルから必要な拡張子を持ったファイルを残し、他を削除する関数。
+	#	拡張子と思わしき部分全てが一致しておく必要がある。
+	#		例）hoge.txt　⇒ .txt　が拡張子。
+	#		例）hoge.txt.bak　⇒ .txt.bak　が拡張子(.bakでは検索に掛からない)。
+	my $self = shift;
+
+	my $main = $self->{option}->{extension};	# オプションの中から拡張子を取り出す。
+	return unless defined $main;	# 設定値がない場合、何もせずに終了する。
+	while( my( $index, $value ) = each ( %$self ) ) {
+		next if ref $value;
+		# ファイル名を拡張子より前の部分・ディレクトリ部分・拡張子部分に分ける。
+		my ( $basename, $dirname, $ext ) = fileparse($value, qr/\..*$/ );
+		if( "\L$main" ne "\L$ext" ) {
+			# 指定拡張子以外の場合、削除。
+			delete $self->{$index};
+		}
+	}
+}
+
+sub optionShow() {
+	# インスタンス生成で保存したオプションを全て表示する。
+	my $self = shift;
+	my @argv = @_;
+	my @notKey = @{$self->{option}->{optionExclusionlist}};	# この項目は非表示。
+
+	croak "引数にファイルを渡すこと。" unless defined(keys %$self);
+	my $special = $";	# バックアップ。
+	$" = '|';
+	foreach my $key ( keys %{$self->{option}} ) {
+		unless( $key =~ /@notKey/ ) {
+			# リファレンスもしくは、空文字列の場合は、非表示。
+			say "$key->$self->{option}->{$key}" if !(ref $self->{$key}) and (defined $self->{option}->{$key});
+		}
+	}
+	$" = $special;	# 戻す。
 }
 
 sub filenameShow() {
@@ -126,8 +282,6 @@ sub filenameShow() {
 	my $self = shift;
 	my @argv = @_;
 
-	#say keys %$self;
-	#say "$self->{0}";
 	croak "引数にファイルを渡すこと。" unless defined(keys %$self);
 	foreach my $key ( keys %$self ) {
 		say "$key->$self->{$key}" unless ref $self->{$key};
@@ -138,10 +292,10 @@ sub filecount() {
 	# 引数に渡したファイル数を戻す。
 	my $self = shift;
 
-	return $self->{option}->{hashSize};
+	return $self->{option}->{filecount};
 }
 
-sub open() {
+sub openfile() {
 	# 引数のファイルを開く(1ファイルのみ)。
 	my $self = shift;
 	my $filename = shift;
@@ -158,43 +312,90 @@ sub filemove() {
 	rename $filename, "$filename.bak";
 }
 
+sub optionRead() {
+	# オプション内容をファイルから読み込む。
+	my $self = shift;
+	my $optionfile;
+
+	#if( defined(ref $self) ) {	# オプションファイル(読み込み)対象。
+	if( ref $self ) {	# オプションファイル(読み込み)対象。
+		if( defined $_[0] ) {
+			$optionfile = shift;	# 引数が与えられている場合は、それを使う。
+		}
+		else{
+			# 通常は、設定ファイルを使う。
+			$optionfile = $self->{option}->{configfile};
+		}
+	}
+	else{
+		$optionfile = $self;
+	}
+
+	open my $file_fh, '<', $optionfile
+		or die "$optionfileファイルオープン失敗($!)。";
+	my @file = <$file_fh>;
+	close $file_fh;
+
+	my $json = JSON::PP->new();
+	my $input = $json->utf8(0)->decode( "@file" );	# JSONデータとして読み込み。
+#say "オプションの書き換え：$optionfile";
+#	while( my( $key, $value ) = each ( %$input )) {
+#		say "$key->$value";
+#	}
+	return $input;
+}
+
+sub optionWrite() {
+	# オプション内容をファイルに書き出す。
+	my $self = shift;
+	my @notKey = @{$self->{option}->{optionExclusionlist}};
+	push @notKey, qw( filesize configfile );	# この項目はハッシュから削除。
+
+	my %copy = %{$self->{option}};
+	map{ delete $copy{$_} } @notKey;
+	my $optionfile = $self->{option}->{configfile};	# オプションファイル(書き込み)対象。
+
+	my $json = JSON::PP->new();
+	my $output = $json->utf8(0)->pretty->canonical->encode( \%copy );	# JSONデータに書き換え実施。
+	open my $file_fh, '>', $optionfile
+		or die "$optionfileファイルオープン失敗($!)。";
+	print $file_fh $output;	# ファイルへの書き出し実施。
+	close $file_fh;
+}
+
 sub write() {
 	# 引数と同じ名前のファイルに書き込む。
 	my $self = shift;
 	my $filename = shift;	# ファイル名
 	my $file = shift;		# ファイルの中身(リファレンス)
 
-	#say $filename . "書き出しファイル名";
 	open my $file_fh, '>', $filename or die "$filenameのファイルオープン失敗($!)";
-	#say "書き出しデータ" . "@$file";
 	foreach my $value ( @$file ) {
 		chomp $value;
 		print $file_fh $value;
 	}
 }
 
-
 package mainProcess;
 use Carp;
-
 our @ISA = qw( parent::process );
 
 sub run() {
 	my $self = shift;
 
+	warn "有効なファイルが存在しない。" . $self->help() unless $self->{option}->{filecount};
+	if( $self->{option}->{optionfiledo} == 1 ) {
+		# 引数で指定された設定ファイルを読み込む。
+		my $optiondata = $self->optionRead( $self->{option}->{optfile} );	# 設定ファイルのJSONデータ(書き換えネタ)。
+		my @key_optiondata = keys %$optiondata;
+		foreach my $key ( @key_optiondata) {
+			$switchOptionset->($key, \%$self, $optiondata->{$key});	# オブジェクト指向プログラミングに反する引数指定。
+		}
+		$self->extensionPartition(\%$self);
+	}
 	while( my ($index, $filename) = each ( %$self ) ){
-		if( -f $filename and -s _ >= $self->{option}->{size} ) {
-		#say "$indexファイル：$filename" . %$self . -f $filename . "<";# . keys %$self;
-		#if( -f $filename ){#and -s _ >= $self->{option}->{size} ) {
-		#say "設定値：$self->{option}->{size}";
-		#say -f $filename;
-		#if( -s $filename >= $self->{option}->{size} ){#and ) {
-		#if( "$index" ne "option" and -s $filename >= $self->{option}->{size} ) {
-			#say "$index, $filename" . %$self;
-		#if( "$index" ne "option"){# and -s $filename >= $self->{option}->{size} ) {
-			#say "$index, $filename. -> " . %$self . -s _;
-#			return;
-			my $file_fh = $self->open($filename);
+		if( -f $filename and -s _ >= $self->{option}->{filesize} ) {
+			my $file_fh = $self->openfile($filename);
 			my $type = "\L$self->{option}->{type}";
 			my @file = <$file_fh>;
 			foreach my $line ( 0 .. $#file ) {
@@ -202,32 +403,35 @@ sub run() {
 				# ファイル内容を1度に読み込むため、気をつけること。
 				my $placeLine;	# ここに置換文字列を格納する。
 				if( "$file[$line]" =~ /$self->{option}->{search}/ ) {
-					#say "変更前：$file[$line]";
 					$placeLine = $line + $self->{option}->{place};	# 置き換え対象行を保存する。
-					#my $placeWord = $file[$placeLine] =~ s/ ([A-Z_]+) \{/\1/r;	# 関数名と思わしき単語を抜き出す(ここでは加工をしない)。
 					my $placeWord = $file[$placeLine] =~ s/.* ([A-Z_]+) \{.*/\1/r;	# 関数名と思わしき単語を抜き出す(ここでは加工をしない)。
-					#say "置換単語：$placeWord";
 					chomp $placeWord;
-					#say "置換単語：$file[$placeLine]";
-					#say ref( $self->{option}->{$type} ) . "関数を呼び出したい$type";
 					my $placeWord = $self->{option}->{$type}->($placeWord);	# 加工
 					my $word = $file[$line] =~ s/$self->{option}->{search}/$placeWord/r;	# 既存行を置き換える。
 					$file[$line] = $word;
-					#say "変更後：<$placeWord>$word";
-					#say "変更後：$file[$line]";
 				}
 			}
 			close $file_fh;	# ファイルハンドル終了。
 			$self->filemove($filename);	# 既存ファイルのバックアップ。
-			#say "<@file>";
-			#foreach my $line (@file) {
-			#	say $line;
-			#}
 			$self->write($filename, \@file);	# 同名ファイルに吐き出し。
+			say "変換対象ファイル：$filename";
 		}
 	}
+	say "以下、設定値。" . $self->{option}->{type};
+	$self->optionShow();
 }
 
 
 "以上。"
+__DATA__
+"\tファイル内容には、置換前の文字列と置換後の文字列が含まれていること。";
+"\t置換対象は、'[ここにファイル名]'をプログラムファイルと同じ場所に作成しておくこと(以下、未実装)。";
+"\tもし、作成しない場合のデフォルト(置換対象)：xxx";
+"\tもし、作成しない場合のデフォルト(置換形式)：キャメル形式(1単語目の頭文字は小文字・2単語目以降の頭文字大文字)";
+"\tファイル内容の1行名：検索対象(デフォルト値：xxx)。";
+"\tファイル内容の2行名：置換形式(デフォルト値：キャメル形式)。";
+"\tファイル内容の3行名：検索場所(当行0・前行-1・次行1など)。";
+"\tファイル内容の4行名：読み込みファイル最大容量。";
+"\t\t\tデフォルト値：ファイル最大容量上限なし(ファイルを一度に読み込むため、メモリ枯渇を防ぐために最大MB数を指定する)。";
+__END__
 # vim: set ts=4 sts=4 sw=4 tw=0 ff=unix fenc=utf-8 ft=perl noexpandtab:
