@@ -1,6 +1,6 @@
 package parent::process;
 BEGIN { push @INC, "." };	# セキュリティ上大丈夫か？
-$VERSION = "0.001";
+$VERSION = "0.800";
 use v5.24;
 use Carp;
 use JSON::PP;	# オプションデータの書き出しもしくは読み込み。

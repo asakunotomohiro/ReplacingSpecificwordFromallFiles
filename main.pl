@@ -1,5 +1,5 @@
 package replacingSpecificwordFromallFiles::main;
-$VERSION = "0.002";
+$VERSION = "0.800";
 use v5.24;
 
 BEGIN { push @INC, "."; };	# セキュリティ上大丈夫か？
