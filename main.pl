@@ -8,8 +8,6 @@ use replacingSpecificwordFromallFiles::mainProcessing;
 sub main() {
 	# ユーザから渡されたファイルを別途保存する。
 	my $object = mainProcess->new(@ARGV);
-	#$object->{option}->{type} = 'hoge';	こっちで変更したものは反映される。
-	say  'main関数' . $object->{option}->{type};
 	$object->help() unless @ARGV;
 	#$object->filenameShow();
 	#say $object->filecount();
@@ -18,7 +16,7 @@ sub main() {
 	#say '-' x 30;
 	$object->run();
 	#$object->optionWrite();
-	$object->optionRead();
+	#$object->optionRead();	# オプションファイルの読み込み。
 }
 &main(@ARGV);
 
